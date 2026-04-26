@@ -9,8 +9,40 @@ class PrivacyAnalyzer:
         self.privacy_keywords = rules.get('privacy_keywords', {})
         self.classify_subitems = rules.get('classify_subitems', {})
 
-    # ================== 增强版敏感 API 扫描 ==================
+    # ================== 敏感 API 扫描 ==================
+    def scan_api_calls(self, source_dir):
+        """扫描所有 .js 文件中的敏感 API 调用（包括 miniprogram_npm 中的第三方代码）"""
+        api_matches = []
+        # 只排除真正无关的目录，不再排除 miniprogram_npm
+        exclude_dirs = ['node_modules', '.git', '__pycache__']
+        for js_file in Path(source_dir).rglob('*.js'):
+            # 检查是否在排除目录中
+            if any(ex_dir in str(js_file).split('\\') for ex_dir in exclude_dirs):
+                continue
+            try:
+                with open(js_file, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read()
+                    for rule in self.api_rules:
+                        pattern = re.escape(rule['api']) + r'\s*\('
+                        if re.search(pattern, content):
+                            api_matches.append({
+                                'api': rule['api'],
+                                'info_type': rule.get('info_type', '未知'),
+                                'description': rule.get('description', ''),
+                                'file': str(js_file.relative_to(source_dir))
+                            })
+            except Exception:
+                continue
 
+        # 去重
+        seen = set()
+        unique = []
+        for m in api_matches:
+            key = (m['api'], m['file'])
+            if key not in seen:
+                seen.add(key)
+                unique.append(m)
+        return unique
 
     # ================== 隐私弹窗检测 ==================
     def check_privacy_popup(self, source_dir):
@@ -80,9 +112,11 @@ class PrivacyAnalyzer:
     def _static_extract(self, source_dir):
         """
         静态提取：扫描所有文本文件，如果文件内容包含足够多的隐私关键词，则采纳。
-        不排除任何目录（包括 miniprogram_npm），以获取第三方库中的隐私声明。
+        跳过 node_modules 等无关目录，但不再排除 miniprogram_npm，以便检测第三方组件中的隐私声明。
         """
         all_texts = []
+        # 排除目录中去掉 'miniprogram_npm'
+        exclude_dirs = ['node_modules', '.git', '__pycache__']
         # 内容关键词（用于判断是否与隐私相关）
         content_keywords = [
             '隐私政策', '个人信息保护', '用户协议', '服务条款', 'privacy policy',
@@ -99,6 +133,9 @@ class PrivacyAnalyzer:
 
         for ext in extensions:
             for file_path in Path(source_dir).rglob('*' + ext):
+                # 跳过排除目录
+                if any(ex_dir in str(file_path).split('\\') for ex_dir in exclude_dirs):
+                    continue
                 total_scanned += 1
 
                 try:
@@ -108,6 +145,7 @@ class PrivacyAnalyzer:
                     if len(cleaned) < 50:
                         continue
 
+                    # 检查内容中是否包含足够多的关键词（至少2个）
                     keyword_count = sum(1 for kw in content_keywords if kw in cleaned)
                     if keyword_count >= 2:
                         all_texts.append(cleaned)
@@ -115,11 +153,13 @@ class PrivacyAnalyzer:
                         accepted_files.append(str(file_path))
                         print(f"[静态提取] 采纳文件: {file_path} (关键词数: {keyword_count}, 长度: {len(cleaned)})")
                     else:
+                        # 可选日志：文件名含隐私但内容关键词不足
                         if any(k in file_path.name.lower() for k in ['privacy', '协议', '政策']):
                             print(f"[静态提取] 文件 {file_path} 包含隐私文件名但内容关键词不足 ({keyword_count}), 未采纳")
                 except Exception as e:
                     print(f"[静态提取] 警告：读取 {file_path} 失败: {e}")
 
+        # 去重
         unique_texts = list(dict.fromkeys(all_texts))
         combined = '\n'.join(unique_texts).strip()
         print(f"[静态提取] 扫描文件总数: {total_scanned}，采纳文件数: {total_accepted}")
