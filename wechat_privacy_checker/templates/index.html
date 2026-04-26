@@ -97,7 +97,7 @@
     <div class="container mt-5 pt-3">
         <div class="text-center mb-4">
             <h1 class="display-5">📱 小程序隐私合规检测工具</h1>
-            <p class="lead">上传加密小程序包 · 自动解密分析 · 生成合规报告</p>
+            <p class="lead">上传小程序源码压缩包 · 自动分析 · 生成合规报告</p>
         </div>
 
         <div class="row justify-content-center">
@@ -105,9 +105,9 @@
                 <div class="card card-upload p-4">
                     <form method="post" enctype="multipart/form-data">
                         <div class="mb-4">
-                            <label for="file" class="form-label fw-semibold">📦 选择小程序包（.wxapkg 或 .zip）</label>
+                            <label for="file" class="form-label fw-semibold">📦 选择小程序包（.zip）</label>
                             <input class="form-control" type="file" name="file" id="file" accept=".wxapkg,.zip" required>
-                            <div class="form-text text-muted mt-2">支持加密的 .wxapkg 文件，或已解包/反编译后的源码 ZIP 包。</div>
+                            <div class="form-text text-muted mt-2">支持已解包/反编译后的源码 ZIP 包。</div>
                         </div>
                         <div class="d-grid gap-3">
                             <button type="submit" class="btn btn-primary-custom btn-lg">🔍 开始检测</button>
